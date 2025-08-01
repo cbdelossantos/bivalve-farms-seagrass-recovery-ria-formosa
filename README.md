@@ -8,5 +8,5 @@ The analysis aims to quantify changes in sediment organic carbon following the a
 
 ## Contents
 
-README.md: This file, containing information about the repository.
-r_code: Script for the data analysis and visualisation of the results.
+- README.md: This file, containing information about the repository.
+- script_analysis.R: Script for the data analysis and visualisation of the results.
