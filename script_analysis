@@ -1,0 +1,637 @@
+#### METADATA ####
+
+# Created: Faro, 3rd November 2022
+# Modifications:
+  # Faro, 8th February 2023
+  # Faro, 9th July 2025
+  # Faro, 31st July 2025
+# Author: Carmen B. de los Santos
+
+#### CITATIONS ####
+
+# r
+citation()
+R.version.string
+
+# r studio
+RStudio.Version()
+
+# specific packages
+citation("effsize")
+
+#### SETTINGS ####
+
+# clean
+rm(list=ls())
+
+# load and install required packages
+packages <- c("tidyverse", "readxl", "ggforce","plyr","patchwork",
+              "cowplot","effsize","Hmisc")
+installed_packages <- packages %in% rownames(installed.packages())
+
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+invisible(lapply(packages, library, character.only = TRUE))
+rm(packages, installed_packages)
+
+# set working directory
+setwd("~/Documents/TRABAJO/PUBLICATIONS/wip/me/farms/wordir/")
+
+# labeller
+category_names <- c("clam_farm" = "Clam farms",
+                  "oyster_farm" = "Oyster farms",
+                  "seagrass" = "Seagrass colonised")
+
+# image file paths
+icon_clam     <- "~/Documents/TRABAJO/PUBLICATIONS/wip/me/farms/wordir/images/ian-symbol-clam.png"
+icon_oyster   <- "~/Documents/TRABAJO/PUBLICATIONS/wip/me/farms/wordir/images/ian-symbol-oyster.png"
+icon_seagrass <- "~/Documents/TRABAJO/PUBLICATIONS/wip/me/farms/wordir/images/ian-symbol-zostera-noltii.png"
+
+# theme
+theme_custom <- theme(plot.background=element_blank()) +
+  theme(panel.background=element_rect(fill="white",colour="black")) +
+  theme(strip.background=element_blank()) +
+  theme(strip.text=element_text(size=9,colour="black",angle=0)) +
+  theme(panel.grid.major=element_blank()) +
+  theme(panel.grid.minor=element_blank()) +
+  theme(axis.text.x=element_text(colour="black",size=12,angle=0)) +
+  theme(axis.text.y=element_text(colour="black",size=12,angle=0)) +
+  theme(axis.title.x=element_text(size=13,vjust=0.2)) +
+  theme(axis.title.y=element_text(size=13)) +
+  theme(plot.margin= unit(c(0.5,0.5,0.5,0.5),"lines")) +
+  theme(legend.background=element_blank()) +
+  theme(legend.key=element_blank()) +
+  theme(legend.key.height=unit(0.8,"line")) + 
+  theme(plot.title=element_text(size=16,face="bold"))
+
+#### DATA ####
+
+# load data
+data.sam <- read_xlsx("./data/data_farms_20250709.xlsx",na="NA",sheet="samples",skip=3)
+data.cor <- read_xlsx("./data/data_farms_20250709.xlsx",na="NA",sheet="cores",skip=3)
+data.bio <- read_xlsx("./data/data_farms_20250709.xlsx",na="NA",sheet="biomass",skip=2)
+
+# select columns
+data.sam <- data.sam[,c("core_id_reg","category","replicate",
+                        "selected_sample","sample_id",
+                        "depth_middle_uncorrected",
+                        "depth_min","depth_max","depth_middle","thickness",
+                        "grinding_method",
+                        "sample_volume_uncorrected","sample_volume","flag_volume",
+                        "sample_dw","flag_dw",
+                        "sample_loi_pre",
+                        "dry_bulk_density","flag_dbd",
+                        "percentage_organic_matter","flag_om")]
+#### FIXIES ####
+
+# exclude F09 (too much water - an extra one was taken to replace it - F10)
+data.sam <- data.sam %>% 
+  filter(core_id_reg!="F09")
+
+data.cor <- data.cor %>% 
+  filter(core_id_reg!="F09")
+
+# exclude samples with dry bulk density > 2.16 g dw cm-3
+# data.sam <- data.sam %>%
+#   filter(dry_bulk_density<2.16)
+
+# remove missing samples
+data.sam <-  data.sam %>%
+  filter(is.na(dry_bulk_density)==F)
+
+#### SEDIMENT - CORES INFORMATION ####
+
+# cores ids
+unique(data.sam[,c("core_id_reg","category")])
+
+# dimensions of the corers
+data.cor$corer_length
+data.cor$core_diameter
+
+# penetration depth
+data.cor[,c("core_id_reg","core_depth")]
+min(data.cor$core_depth)
+max(data.cor$core_depth)
+
+# compaction rate
+data.cor[,c("core_id_reg","compaction_rate")]
+round(min(data.cor$compaction_rate),1)
+round(max(data.cor$compaction_rate),1)
+
+# total samples per core IDs and category
+table(data.sam$core_id_reg)
+
+# samples of OM analysed per core
+nrow(data.sam[is.na(data.sam$percentage_organic_matter)==F,])
+table(data.sam[is.na(data.sam$percentage_organic_matter)==F,]$core_id_reg)
+max(table(data.sam[is.na(data.sam$percentage_organic_matter)==F,]$core_id_reg))
+min(table(data.sam[is.na(data.sam$percentage_organic_matter)==F,]$core_id_reg))
+
+# amount of sediment mass used for loi
+summary(data.sam[is.na(data.sam$percentage_organic_matter)==F,]$sample_loi_pre)
+sd(data.sam[is.na(data.sam$percentage_organic_matter)==F,]$sample_loi_pre)
+length(data.sam[is.na(data.sam$percentage_organic_matter)==F,]$sample_loi_pre)
+
+#### SEDIMENT - SAMPLE SELECTION FOR OM ANALYSIS ####
+
+# dry bulk density
+ggplot(data.sam,aes(y=dry_bulk_density,x=depth_middle)) +
+  geom_line(data=data.sam,aes(y=dry_bulk_density,x=depth_middle)) +
+  geom_point(data=data.sam,aes(y=dry_bulk_density,x=depth_middle,
+                               colour=factor(selected_sample)),shape=21) +
+  geom_vline(xintercept=c(25,50,75),linetype=2,colour="grey40") +
+  scale_y_continuous("Dry bulk density (g cm-3)") +
+  scale_x_reverse("Depth (cm)") +
+  coord_flip() +
+  facet_wrap(core_id_reg~category) +
+  theme(legend.position="top") +
+  theme_custom
+
+# select data with OM values
+data.car <- data.sam %>%
+  filter(is.na(percentage_organic_matter)==F)
+
+#### SEDIMENT - EXPLORATORY GENERAL ####
+
+# correlation sample volume (uncorrected) and dry weight
+ggplot(data.sam,aes(x=sample_volume_uncorrected,y=sample_dw,colour=core_id_reg)) +
+  geom_point(shape=21)
+
+# correlation sample volume (corrected) and dry weight
+ggplot(data.sam,aes(x=sample_volume,y=sample_dw,colour=core_id_reg)) +
+  geom_point(shape=21)
+
+# histograms organic matter
+ggplot(data.car,aes(x=percentage_organic_matter)) +
+  geom_histogram(binwidth=0.5,fill="grey80",colour="grey20") +
+  theme_custom
+
+ggplot(data.car,aes(x=percentage_organic_matter)) +
+  geom_histogram(binwidth=0.5,fill="grey80",colour="grey20") +
+  facet_wrap(.~core_id_reg) +
+  theme_custom
+
+# histograms dry bulk density
+ggplot(data.car,aes(x=dry_bulk_density)) +
+  geom_histogram(binwidth=0.5,fill="grey80",colour="grey20") +
+  geom_vline(xintercept=2.16, linetype=2, colour="blue") +
+  theme_custom
+
+ggplot(data.car,aes(x=dry_bulk_density)) +
+  geom_histogram(binwidth=0.5,fill="grey80",colour="grey20") +
+  facet_wrap(.~core_id_reg) +
+  geom_vline(xintercept=2.16, linetype=2, colour="blue") +
+  theme_custom
+
+# correlation organic matter and dry bulk density -  all
+ggplot() +
+  geom_point(data=data.car,aes(x=dry_bulk_density,y=percentage_organic_matter,
+                          colour=core_id_reg),shape=21) +
+  geom_smooth(data=data.car,aes(x=dry_bulk_density,y=percentage_organic_matter),
+              formula="y~x",method="loess") +
+  scale_x_continuous("Dry bulk density \n (g dw cm-3)",breaks=c(seq(0,3,0.5))) +
+  scale_y_continuous("Organic matter content \n (% dw)") +
+  theme_custom
+
+# correlation organic matter and dry bulk density -  category
+ggplot() +
+  geom_point(data=data.car,aes(x=dry_bulk_density,y=percentage_organic_matter,
+                               colour=core_id_reg),shape=21) +
+  geom_smooth(data=data.car,aes(x=dry_bulk_density,y=percentage_organic_matter),
+              formula="y~x",method="loess") +
+  scale_x_continuous("Dry bulk density \n (g dw cm-3)",breaks=c(seq(0,3,0.5))) +
+  scale_y_continuous("Organic matter content \n (% dw)") +
+  facet_wrap(.~category) +
+  theme_custom
+
+#### SEDIMENT - CALCULATION ORGANIC CARBON STOCKS ####
+
+# estimate OC content using local regression from Martins et al. 2022
+data.car <- data.car %>% 
+  mutate(percentage_organic_carbon=-0.066 + 0.3102*percentage_organic_matter)
+
+data.sam <- data.sam %>% 
+  mutate(percentage_organic_carbon=-0.066 + 0.3102*percentage_organic_matter)
+
+# set to 0 if a negative value is obtained
+data.car$percentage_organic_carbon <- ifelse(data.car$percentage_organic_carbon<0,0,
+                                             data.car$percentage_organic_carbon)
+
+data.sam$percentage_organic_carbon <- ifelse(data.sam$percentage_organic_carbon<0,0,
+                                             data.sam$percentage_organic_carbon)
+
+# calculate OC density (g OM cm-3) as the product of OM content/100 and the dry bulk density
+data.car$oc_density <-data.car$percentage_organic_carbon*data.car$dry_bulk_density/100
+
+# prepare data for all the cores
+sed_samples <- data.car[is.na(data.car$percentage_organic_matter)==F,
+                        c("core_id_reg",             # core id (unique)
+                          "depth_middle",        # middle sample depth (cm) compaction-corrected
+                          "oc_density"           # OC density (g OC cm-3)
+                        )]
+
+## STOCKS 100 cm
+# chose the depth at which the stock is estimated
+min_depth <- 0       # start of stock (cm)
+max_depth <- 100     # end of stock (cm)
+
+# chose how to extrapolate if the core does not reach the maximum depth to estimate the stock
+# extrapolation_rule <- 1 # stops stock calculation at last recorded depth
+extrapolation_rule <- 2 # takes last recorded value and extends it to the end
+
+# OC stocks (g OC cm-2)
+data.sto.100 <- sed_samples %>%
+  # group by core 
+  dplyr::group_by(core_id_reg) %>%
+  # separate the data of each core
+  tidyr::nest() %>%
+  # map
+  dplyr::mutate(
+    stock = purrr::map_dbl(
+      data,
+      function(df) {
+        MESS::auc(
+          x = df$depth_middle,
+          y = df$oc_density,
+          from = min_depth,
+          to = max_depth,
+          type = "linear",
+          rule = extrapolation_rule
+        )
+      }
+    )
+  )
+data.sto.100
+data.sto.100$stock_cat <- "100 cm"
+
+## STOCKS 025 cm
+# chose the depth at which the stock is estimated
+min_depth <- 0       # start of stock (cm)
+max_depth <- 25     # end of stock (cm)
+
+# chose how to extrapolate if the core does not reach the maximum depth to estimate the stock
+# extrapolation_rule <- 1 # stops stock calculation at last recorded depth
+extrapolation_rule <- 2 # takes last recorded value and extends it to the end
+
+# OC stocks (g OC cm-2)
+data.sto.025 <- sed_samples %>%
+  # group by core 
+  dplyr::group_by(core_id_reg) %>%
+  # separate the data of each core
+  tidyr::nest() %>%
+  # map
+  dplyr::mutate(
+    stock = purrr::map_dbl(
+      data,
+      function(df) {
+        MESS::auc(
+          x = df$depth_middle,
+          y = df$oc_density,
+          from = min_depth,
+          to = max_depth,
+          type = "linear",
+          rule = extrapolation_rule
+        )
+      }
+    )
+  )
+data.sto.025$stock_cat <- "25 cm"
+
+# bind stocks data sets
+data.sto <- rbind(data.sto.100,data.sto.025)
+
+# add category and replicate information
+data.sto <- merge(data.cor[,c("core_id_reg","category","replicate")],data.sto)
+data.sto$data <- NULL
+data.sto
+
+# save
+write_csv(data.sto,
+          "~/Documents/TRABAJO/PUBLICATIONS/wip/me/farms/wordir/tables/table_stocks_oc.csv")
+
+# clean
+rm(sed_samples,extrapolation_rule,max_depth,min_depth,
+   data.sto.025,data.sto.100)
+
+#### SEDIMENT - DESCRIPTIVE STATS - DBD, OM, OC ####
+
+# function to process a given layer (e.g., 0–25 cm or 0–100 cm)
+# to obtain the descriptive stats
+
+process_layer <- function(data, layer_max) {
+  data_layer <- data %>%
+    filter(depth_max <= layer_max) %>% # filter only data within the desired layer
+    select(core_id_reg, category, replicate, depth_min, depth_max,
+           dry_bulk_density, percentage_organic_matter, percentage_organic_carbon) %>%
+    mutate(core_id_reg = as.factor(core_id_reg))
+  
+  # reshape to long format
+  data_long <- pivot_longer(
+    data_layer,
+    cols = c(dry_bulk_density, percentage_organic_matter, percentage_organic_carbon),
+    names_to = "variable",
+    values_to = "value"
+  ) %>%
+    filter(!is.na(value)) %>%
+    mutate(thickness = depth_max - depth_min) %>%
+    select(core_id_reg, category, variable, value, thickness)
+  
+  # core-level statistics
+  table.core <- data_long %>%
+    group_by(core_id_reg, category, variable) %>%
+    dplyr::summarise(
+      n = n(),
+      mean = mean(value, na.rm = TRUE),
+      sd = sd(value, na.rm = TRUE),
+      weighted.mean = weighted.mean(value, thickness, na.rm = TRUE),
+      weighted.sd = sqrt(wtd.var(value, thickness, na.rm = TRUE)),
+    ) %>%
+    ungroup() %>%
+    mutate(layer = paste0(layer_max, "-cm"))
+  
+  return(table.core)
+}
+
+# run function for both 100 cm and 25 cm layers
+table.core.100 <- process_layer(data.car, 100)
+table.core.025 <- process_layer(data.car, 25)
+
+# combine core-level results
+table.core <- bind_rows(table.core.100, table.core.025) %>%
+  arrange(layer, variable, category, core_id_reg)
+table.core
+
+# habitat-level summary (mean ± SE across cores)
+table.habitat <- table.core %>%
+  group_by(category, variable, layer) %>%
+  dplyr::summarise(
+    mean = mean(weighted.mean, na.rm = TRUE),
+    sd = sd(weighted.mean, na.rm = TRUE),  # variability between cores
+    se = sd(weighted.mean, na.rm = TRUE) / sqrt(n()),  # standard error
+    n = n(),  # number of cores per habitat
+  ) %>%
+  ungroup() %>%
+  arrange(layer, variable, category)
+table.habitat
+
+# save
+write_csv(table.core,
+          "~/Documents/TRABAJO/PUBLICATIONS/wip/me/farms/wordir/tables/table_variables_core.csv")
+write_csv(table.habitat,
+          "~/Documents/TRABAJO/PUBLICATIONS/wip/me/farms/wordir/tables/table_variables_habitat.csv")
+
+# clean
+rm(process_layer,table.core,table.habitat)
+
+#### SEDIMENT - DESCRIPTIVE STATS - OC STOCKS ####
+
+# check data stocks
+head(data.sto)
+
+# calculate mean and standard error per habitat category
+table.habitat.sto <- data.sto %>%
+  group_by(category, stock_cat) %>%
+  dplyr::summarise(
+    n = n(),
+    mean = mean(stock, na.rm = TRUE),
+    sd = sd(stock, na.rm = TRUE),
+    se = sd(stock, na.rm = TRUE) / sqrt(n())
+  ) %>%
+  ungroup()
+table.habitat.sto
+
+# save
+write_csv(table.habitat.sto,
+          "~/Documents/TRABAJO/PUBLICATIONS/wip/me/farms/wordir/tables/table_stock_habitat.csv")
+
+# clean
+rm(table.habitat.sto)
+
+#### SEDIMENT - PAIRWISE COMPARISONS - DBD, OM, OC ####
+
+# define data sets
+data.core.025 <- table.core.025 %>%
+  select(core_id_reg,category,layer,variable,weighted.mean) %>% # keep only what's needed
+  pivot_wider(names_from = variable,
+              values_from = weighted.mean)
+data.core.100 <- table.core.100 %>%
+  select(core_id_reg,category,layer,variable,weighted.mean) %>% # keep only what's needed
+  pivot_wider(names_from = variable,
+              values_from = weighted.mean)
+
+# Cliff’s delta (magnitude of difference)
+cliff.delta(dry_bulk_density~category,data=data.core.100,subset=category %in% c("seagrass","oyster"))
+cliff.delta(dry_bulk_density~category,data=data.core.100,subset=category %in% c("seagrass","clam"))
+cliff.delta(dry_bulk_density~category,data=data.core.100,subset=category %in% c("oyster","clam"))
+
+# Cliff’s delta (magnitude of difference)
+cliff.delta(percentage_organic_matter~category,data=data.core.100,subset=category %in% c("seagrass","oyster"))
+cliff.delta(percentage_organic_matter~category,data=data.core.100,subset=category %in% c("seagrass","clam"))
+cliff.delta(percentage_organic_matter~category,data=data.core.100,subset=category %in% c("oyster","clam"))
+
+# Cliff’s delta (magnitude of difference)
+cliff.delta(percentage_organic_carbon~category,data=data.core.100,subset=category %in% c("seagrass","oyster"))
+cliff.delta(percentage_organic_carbon~category,data=data.core.100,subset=category %in% c("seagrass","clam"))
+cliff.delta(percentage_organic_carbon~category,data=data.core.100,subset=category %in% c("oyster","clam"))
+
+# Cliff’s delta (magnitude of difference)
+cliff.delta(dry_bulk_density~category,data=data.core.025,subset=category %in% c("seagrass","oyster"))
+cliff.delta(dry_bulk_density~category,data=data.core.025,subset=category %in% c("seagrass","clam"))
+cliff.delta(dry_bulk_density~category,data=data.core.025,subset=category %in% c("oyster","clam"))
+
+# Cliff’s delta (magnitude of difference)
+cliff.delta(percentage_organic_matter~category,data=data.core.025,subset=category %in% c("seagrass","oyster"))
+cliff.delta(percentage_organic_matter~category,data=data.core.025,subset=category %in% c("seagrass","clam"))
+cliff.delta(percentage_organic_matter~category,data=data.core.025,subset=category %in% c("oyster","clam"))
+
+# Cliff’s delta (magnitude of difference)
+cliff.delta(percentage_organic_carbon~category,data=data.core.025,subset=category %in% c("seagrass","oyster"))
+cliff.delta(percentage_organic_carbon~category,data=data.core.025,subset=category %in% c("seagrass","clam"))
+cliff.delta(percentage_organic_carbon~category,data=data.core.025,subset=category %in% c("oyster","clam"))
+
+#### SEDIMENT - PAIRWISE COMPARISONS - OC STOCKS ####
+
+# define stock data sets
+data100 <- data.sto[data.sto$stock_cat=="100 cm",]
+data025 <- data.sto[data.sto$stock_cat=="25 cm",]
+
+# Cliff’s delta (magnitude of difference)
+cliff.delta(stock~category,data=data100,subset=category %in% c("seagrass","oyster"))
+cliff.delta(stock~category,data=data100,subset=category %in% c("seagrass","clam"))
+cliff.delta(stock~category,data=data100,subset=category %in% c("oyster","clam"))
+
+# Cliff’s delta (magnitude of difference)
+cliff.delta(stock~category,data=data025,subset=category %in% c("seagrass","oyster"))
+cliff.delta(stock~category,data=data025,subset=category %in% c("seagrass","clam"))
+cliff.delta(stock~category,data=data025,subset=category %in% c("oyster","clam"))
+
+# clean
+rm(data025,data100)
+
+#### SEDIMENT - FIGURES INDIVIDUAL PROFILES ####
+
+# prepare loop
+ncores <- unique(data.sam$core_id_reg) # this is a vector with the cores ids
+nplots <- list() # this is an empty list where the plot of each core will be saved
+
+# create loop
+for(i in 1:length(ncores)){
+  
+  # select data for core i
+  pdata <- data.sam[data.sam$core_id_reg==ncores[i],]
+  pdata <- arrange(pdata,depth_min)
+  pdata <- pdata[is.na(pdata$percentage_organic_matter)==F,]
+  
+  # create the plots
+  nplots[[i]] <- ggplot(pdata,aes(x=depth_middle,y=percentage_organic_matter)) +
+    geom_line(linetype=1,colour="darkgrey") +
+    geom_point(shape=21) +
+    coord_flip() +
+    scale_x_reverse("Depth (cm)",limits=c(150,0)) +
+    scale_y_continuous("Organic matter content \n (% dw)",limits=c(0,20)) +
+    ggtitle(paste0(ncores[i]," - ",pdata$category[1]," - ",pdata$replicate[1])) +
+    theme_bw()
+  
+  # save plots
+  ggsave(nplots[[i]],
+         width=4,
+         height=6,
+         file=paste0("profile_om_",ncores[i],".pdf"),
+         path="~/Documents/TRABAJO/PUBLICATIONS/wip/me/farms/wordir/figures/")
+}
+
+# clean
+rm(ncores,i,nplots,pdata)
+
+
+# prepare loop
+ncores <- unique(data.car$core_id_reg) # this is a vector with the cores ids
+nplots <- list() # this is an empty list where the plot of each core will be saved
+
+# create loop
+for(i in 1:length(ncores)){
+  
+  # select data for core i
+  pdata <- data.car[data.car$core_id_reg==ncores[i],]
+  pdata <- arrange(pdata,depth_min)
+  pdata <- pdata[is.na(pdata$percentage_organic_carbon)==F,]
+  
+  # create the plots
+  nplots[[i]] <- ggplot(pdata,aes(x=depth_middle,y=percentage_organic_carbon)) +
+    geom_line(linetype=1,colour="darkgrey") +
+    geom_point(shape=21) +
+    coord_flip() +
+    scale_x_reverse("Depth (cm)",limits=c(150,0)) +
+    scale_y_continuous("Organic matter carbon \n (% dw)",limits=c(0,7)) +
+    ggtitle(paste0(ncores[i]," - ",pdata$category[1]," - ",pdata$replicate[1])) +
+    theme_bw()
+  
+  # save plots
+  ggsave(nplots[[i]],
+         width=4,
+         height=6,
+         file=paste0("profile_oc_",ncores[i],".pdf"),
+         path="~/Documents/TRABAJO/PUBLICATIONS/wip/me/farms/wordir/figures/")
+}
+
+# clean
+rm(ncores,i,nplots,pdata)
+
+#### SEDIMENT - FIGURE ALL PROFILES ####
+
+# organic carbon profile
+fig <- ggplot(data.car,aes(x=depth_middle,y=percentage_organic_carbon,
+                    colour=category,linetype=replicate)) +
+  geom_line() +
+  geom_vline(xintercept=c(25,100),linetype=2,colour="darkgrey") +
+  scale_y_continuous("Organic carbon content (% dw)",
+                     breaks=c(0:6)) +
+  scale_x_reverse("Depth (cm)") +
+  scale_colour_manual("Core ID",values=c("#E66101","#5E3C99","#1B7837")) +
+  coord_flip() +
+  facet_grid(.~category,
+             labeller=labeller(category=category_names)) +
+  theme_custom +
+  theme(strip.text=element_text(size=8,face="bold",color="black"),
+        strip.background=element_rect(fill="white",color="black")) +
+  guides(colour="none",linetype="none")
+# + theme(legend.position = "top")
+fig
+
+# add icons
+fig <- ggdraw(fig) +
+  draw_image(icon_clam,
+             x=0.3,y=0.78,width=0.09,height=0.09) +
+  draw_image(icon_oyster,
+             x=0.6,y=0.78,width=0.1,height=0.1) +
+  draw_image(icon_seagrass,
+             x=0.89,y=0.78,width=0.11,height=0.11)
+fig
+
+# # add core_id labels
+# fig <- fig + 
+#   annotate("text",y=0.6,x=0.6,label="F01",colour="#5E3C99",size=2) +
+#   annotate("text",y=0.5,x=0.59,label="F06",colour="#5E3C99",size=2) +
+#   annotate("text",y=0.35,x=0.49,label="F05",colour="#5E3C99",size=2) +
+#   annotate("text",y=0.4,x=0.23,label="F02",colour="#E66101",size=2) +
+#   annotate("text",y=0.35,x=0.87,label="F04",colour="#1B7837",size=2) +
+#   annotate("text",y=0.35,x=0.76,label="F07",colour="#1B7837",size=2)
+# fig
+  
+# save
+ggsave(fig,
+       width=6,height=4,
+       file=paste0("figure_profiles_oc.pdf"),
+       path="~/Documents/TRABAJO/PUBLICATIONS/wip/me/farms/wordir/figures")  
+
+# clean
+rm(fig)
+
+#### SEDIMENT - FIGURE STOCKS ####
+
+# define data sets
+data100 <- data.sto[data.sto$stock_cat=="100 cm",]
+data025 <- data.sto[data.sto$stock_cat=="25 cm",]
+
+# stock 1-m per category and core id
+fig <- ggplot(data=data100,
+              aes(x=category,y=stock,label=core_id_reg,fill=category)) +
+  geom_col(position=position_dodge2(width=0.9,preserve="single")) +
+  geom_text(position=position_dodge2(width=0.9,preserve="single"),size=3,angle=90,hjust=-0.5) +
+  geom_col(data=data025,
+           aes(x=category,y=stock,colour=category),
+           position=position_dodge2(width=0.9,preserve="single")) +
+  scale_x_discrete("Core ID") +
+  scale_y_continuous(expression("Organic carbon stock "~(g~cm^-2)),limits=c(0,1.5)) +
+  scale_fill_manual("",values=c("#FDB863","#B2ABD2","#A6DBA0")) +
+  scale_colour_manual("",values=c("#E66101","#5E3C99","#1B7837")) +
+  facet_wrap(~category,scales="free_x",
+             labeller=labeller(category=category_names)) +
+  theme_custom + theme(axis.text.x=element_blank(),axis.ticks.x=element_blank()) +
+  theme(strip.text=element_text(size=8,face="bold",color="black"),
+        strip.background=element_rect(fill="white",color="black")) +
+  guides(fill="none",colour="none")
+fig
+
+# add icons
+fig <- ggdraw(fig) +
+  draw_image(icon_clam,
+             x=0.3,y=0.78,width=0.09,height=0.09) +
+  draw_image(icon_oyster,
+             x=0.6,y=0.78,width=0.1,height=0.1) +
+  draw_image(icon_seagrass,
+             x=0.89,y=0.78,width=0.11,height=0.11)
+fig
+
+# save
+ggsave(fig,
+       width=6,height=4,
+       file=paste0("figure_stock_cores.pdf"),
+       path="~/Documents/TRABAJO/PUBLICATIONS/wip/me/farms/wordir/figures")  
+
+# clean
+rm(fig,data100,data025)
+
+#### END ####
