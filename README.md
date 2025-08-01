@@ -1,4 +1,4 @@
-# Data Analysis Code: Carbon restoration in abandoned bivalve farms via seagrass recolonisation: a case study from the Ria Formosa lagoon
+# Data analysis: Carbon restoration in abandoned bivalve farms via seagrass recolonisation: a case study from the Ria Formosa lagoon
 
 This repository contains the R code used to analyze data for a study assessing the carbon restoration potential in abandoned bivalve farming areas in the Ria Formosa lagoon (South Portugal).
 
