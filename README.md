@@ -5,3 +5,8 @@ This repository contains the R code used to analyze data for a study assessing t
 ## Overview
 
 The analysis aims to quantify changes in sediment organic carbon following the abandonment of aquaculture. The workflow includes data cleaning, statistical analysis, and visualization.
+
+## Contents
+
+README.md: This file, containing information about the repository.
+r_code: Script for the data analysis and visualisation of the results.
