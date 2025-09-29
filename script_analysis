@@ -1,10 +1,6 @@
 #### METADATA ####
 
 # Created: Faro, 3rd November 2022
-# Modifications:
-  # Faro, 8th February 2023
-  # Faro, 9th July 2025
-  # Faro, 31st July 2025
 # Author: Carmen B. de los Santos
 
 #### CITATIONS ####
@@ -71,14 +67,12 @@ theme_custom <- theme(plot.background=element_blank()) +
 # load data
 data.sam <- read_xlsx("./data/data_farms_20250709.xlsx",na="NA",sheet="samples",skip=3)
 data.cor <- read_xlsx("./data/data_farms_20250709.xlsx",na="NA",sheet="cores",skip=3)
-data.bio <- read_xlsx("./data/data_farms_20250709.xlsx",na="NA",sheet="biomass",skip=2)
 
 # select columns
 data.sam <- data.sam[,c("core_id_reg","category","replicate",
                         "selected_sample","sample_id",
                         "depth_middle_uncorrected",
                         "depth_min","depth_max","depth_middle","thickness",
-                        "grinding_method",
                         "sample_volume_uncorrected","sample_volume","flag_volume",
                         "sample_dw","flag_dw",
                         "sample_loi_pre",
