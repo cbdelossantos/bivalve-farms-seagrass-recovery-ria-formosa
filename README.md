@@ -10,3 +10,6 @@ The analysis aims to quantify changes in sediment organic carbon following the a
 
 - README.md: This file, containing information about the repository.
 - script_analysis.R: Script for the data analysis and visualisation of the results.
+
+## Data availability    
+Acces data at 10.5281/zenodo.15854317 
