@@ -550,6 +550,7 @@ fig <- ggplot(data.car,aes(x=depth_middle,y=percentage_organic_carbon,
                      breaks=c(0:6)) +
   scale_x_reverse("Depth (cm)") +
   scale_colour_manual("Core ID",values=c("#E66101","#5E3C99","#1B7837")) +
+  scale_linetype_manual("",values=c(1,3,2)) +
   coord_flip() +
   facet_grid(.~category,
              labeller=labeller(category=category_names)) +
@@ -557,7 +558,6 @@ fig <- ggplot(data.car,aes(x=depth_middle,y=percentage_organic_carbon,
   theme(strip.text=element_text(size=8,face="bold",color="black"),
         strip.background=element_rect(fill="white",color="black")) +
   guides(colour="none",linetype="none")
-# + theme(legend.position = "top")
 fig
 
 # add icons
@@ -571,14 +571,16 @@ fig <- ggdraw(fig) +
 fig
 
 # # add core_id labels
-# fig <- fig + 
-#   annotate("text",y=0.6,x=0.6,label="F01",colour="#5E3C99",size=2) +
-#   annotate("text",y=0.5,x=0.59,label="F06",colour="#5E3C99",size=2) +
-#   annotate("text",y=0.35,x=0.49,label="F05",colour="#5E3C99",size=2) +
-#   annotate("text",y=0.4,x=0.23,label="F02",colour="#E66101",size=2) +
-#   annotate("text",y=0.35,x=0.87,label="F04",colour="#1B7837",size=2) +
-#   annotate("text",y=0.35,x=0.76,label="F07",colour="#1B7837",size=2)
-# fig
+fig <- fig +
+  annotate("text",y=0.71,x=0.62,label="F01",colour="#5E3C99",size=3) +
+  annotate("text",y=0.5,x=0.54,label="F06",colour="#5E3C99",size=3) +
+  annotate("text",y=0.33,x=0.45,label="F05",colour="#5E3C99",size=3) +
+  annotate("text",y=0.38,x=0.17,label="F02",colour="#E66101",size=3) +
+  annotate("text",y=0.24,x=0.24,label="F10",colour="#E66101",size=3) +
+  annotate("text",y=0.17,x=0.17,label="F08",colour="#E66101",size=3) +
+  annotate("text",y=0.36,x=0.86,label="F04",colour="#1B7837",size=3) +
+  annotate("text",y=0.36,x=0.74,label="F07",colour="#1B7837",size=3)
+fig
   
 # save
 ggsave(fig,
